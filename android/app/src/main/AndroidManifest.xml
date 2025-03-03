@@ -84,7 +84,7 @@
       tools:targetApi="33">
 
     <receiver
-        android:name=".homewidgets.FavoriteBookmarkWidget"
+        android:name=".bookmarks.FavoriteBookmarkWidget"
         android:exported="true">
         <intent-filter>
             <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -95,9 +95,8 @@
     </receiver>
 
     <activity
-        android:name=".homewidgets.FavoriteBookmarkWidgetConfigActivity"
+        android:name=".bookmarks.FavoriteBookmarkWidgetConfigActivity"
         android:exported="true"
-        android:theme="@style/Theme.AppCompat.Light"
         android:label="@string/widget_name">
       <intent-filter>
         <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
@@ -381,18 +380,18 @@
       </intent-filter>
     </activity-alias>
 
-        <activity
-    android:name="app.organicmaps.MwmActivity"
-    android:launchMode="singleTask"
-    android:configChanges="uiMode"
-    android:screenOrientation="fullUser"
-    android:exported="true"
-    android:windowSoftInputMode="stateAlwaysHidden|adjustPan">
-    <intent-filter>
-        <action android:name="app.organicmaps.action.SHOW_BOOKMARK" />
-        <category android:name="android.intent.category.DEFAULT" />
-    </intent-filter>
-</activity>
+    <activity
+            android:name="app.organicmaps.MwmActivity"
+            android:launchMode="singleTask"
+            android:configChanges="uiMode"
+            android:screenOrientation="fullUser"
+            android:exported="true"
+            android:windowSoftInputMode="stateAlwaysHidden|adjustPan">
+            <intent-filter>
+                <action android:name="app.organicmaps.action.SHOW_BOOKMARK" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+    </activity>    
 
     <activity-alias
         android:name="${applicationId}.ManageSpaceActivity"

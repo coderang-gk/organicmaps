@@ -1,0 +1,191 @@
+package app.organicmaps.bookmarks;
+
+
+import android.appwidget.AppWidgetManager;
+import android.content.Intent;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.widget.CheckBox;
+import android.widget.ImageView;
+import android.widget.Toast;
+import android.widget.TextView;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import app.organicmaps.R;
+import app.organicmaps.adapter.OnItemClickListener;
+import app.organicmaps.bookmarks.data.BookmarkCategory;
+import app.organicmaps.bookmarks.data.BookmarkInfo;
+import app.organicmaps.bookmarks.data.BookmarkManager;
+import app.organicmaps.content.DataSource;
+import app.organicmaps.MwmApplication;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class FavoriteBookmarkWidgetConfigActivity extends AppCompatActivity {
+
+    private static final String TAG = "BookmarkWidgetConfig";
+
+    private int mAppWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
+    private TextView mSelectTextView;
+    private RecyclerView mCategoriesRecyclerView;
+    private RecyclerView mBookmarksRecyclerView;
+    private View mBackButton;
+
+    private List<BookmarkCategory> mCategories = new ArrayList<>();
+    private BookmarkCategory mCurrentCategory;
+    private boolean mShowingCategories = true;
+
+
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+
+
+        setResult(RESULT_CANCELED);
+
+        Intent intent = getIntent();
+        Bundle extras = intent.getExtras();
+        if (extras != null) {
+            mAppWidgetId = extras.getInt(
+                    AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID);
+        }
+
+        if (mAppWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+            finish();
+            return;
+        }
+
+
+        setContentView(R.layout.activity_widget_config);
+
+        mSelectTextView = findViewById(R.id.select_text);
+        mCategoriesRecyclerView = findViewById(R.id.categories_recycler);
+        mBookmarksRecyclerView = findViewById(R.id.bookmarks_recycler);
+        mBackButton = findViewById(R.id.back_button);
+
+        mCategoriesRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        mBookmarksRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+
+        mBackButton.setOnClickListener(v -> onBackPressed());
+
+        loadCategories();
+    }
+
+    private void loadCategories() {
+
+
+            mShowingCategories = true;
+            mBookmarksRecyclerView.setVisibility(View.GONE);
+            mCategoriesRecyclerView.setVisibility(View.VISIBLE);
+            mSelectTextView.setText(R.string.select_list);
+
+            mCategories = BookmarkManager.INSTANCE.getCategories();
+            List<BookmarkCategory> nonEmptyCategories = new ArrayList<>();
+            for (BookmarkCategory category : mCategories) {
+                if (category.getBookmarksCount() > 0) {
+                    nonEmptyCategories.add(category);
+                }
+            }
+            mCategories = nonEmptyCategories;
+
+            BookmarkWidgetCategoriesAdapter adapter = new BookmarkWidgetCategoriesAdapter(this, mCategories);
+
+            adapter.setOnClickListener(new OnItemClickListener<BookmarkCategory>() {
+                @Override
+                public void onItemClick(View view, BookmarkCategory category) {
+                    mCurrentCategory = category;
+                    showBookmarksForCategory(category);
+                }
+            });
+
+            mCategoriesRecyclerView.setAdapter(adapter);
+    }
+
+
+
+
+    private void showBookmarksForCategory(BookmarkCategory category) {
+        mShowingCategories = false;
+        mCategoriesRecyclerView.setVisibility(View.GONE);
+        mBookmarksRecyclerView.setVisibility(View.VISIBLE);
+        mSelectTextView.setText(R.string.select_bookmark);
+
+        // Create a data source for the selected category
+        DataSource<BookmarkCategory> dataSource = new DataSource<BookmarkCategory>() {
+            @Override
+            public BookmarkCategory getData() {
+                return category;
+            }
+
+            @Override
+            public void invalidate() {
+                // Not needed for this implementation
+            }
+        };
+
+        // Set up adapter for bookmarks list
+        BookmarkListAdapter adapter = new BookmarkListAdapter(dataSource);
+
+        adapter.setOnClickListener((view, position) -> {
+            Object item = adapter.getItem(position);
+            if (item instanceof BookmarkInfo) {
+                BookmarkInfo bookmarkInfo = (BookmarkInfo) item;
+                int bookmarkIndex = -1;
+
+                // Find the position of this bookmark in the category
+                for (int i = 0; i < category.getBookmarksCount(); i++) {
+                    long id = BookmarkManager.INSTANCE.getBookmarkIdByPosition(category.getId(), i);
+                    if (id == bookmarkInfo.getBookmarkId()) {
+                        bookmarkIndex = i;
+                        break;
+                    }
+                }
+
+                if (bookmarkIndex >= 0) {
+                    Log.d(TAG, "Selected bookmark: " + bookmarkInfo.getName());
+
+                    // Save selected bookmark preferences
+                    FavoriteBookmarkWidget.saveBookmarkPref(
+                            this,
+                            mAppWidgetId,
+                            mCategories.indexOf(mCurrentCategory),
+                            bookmarkIndex,
+                            bookmarkInfo.getName(),
+                            bookmarkInfo.getIcon().getColor());
+
+                    // Update widget
+                    AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(this);
+                    FavoriteBookmarkWidget.updateWidget(this, appWidgetManager, mAppWidgetId);
+
+                    // Set result OK and finish activity
+                    Intent resultValue = new Intent();
+                    resultValue.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, mAppWidgetId);
+                    setResult(RESULT_OK, resultValue);
+
+                    finish();
+                }
+            }
+        });
+
+        mBookmarksRecyclerView.setAdapter(adapter);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (!mShowingCategories) {
+            loadCategories();
+        } else {
+            setResult(RESULT_CANCELED);
+            super.onBackPressed();
+        }
+    }
+}
