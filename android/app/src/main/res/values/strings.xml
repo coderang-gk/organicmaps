@@ -933,6 +933,9 @@
     <string name="uri_open_location_failed">No app installed that can open the location</string>
     <!-- preference string for using auto theme only in navigation mode -->
     <string name="nav_auto">Auto in navigation</string>
+    <string name="widget_name">Favorite Place</string>
+    <string name="select_bookmark">Select bookmark</string>
+    <string name="widget_description">Quick access to your favorite places</string>
 
     <!-- SECTION: Types -->
     <string name="type.addr_interpolation">Address/Block</string>
@@ -2326,9 +2329,6 @@
     <string name="type.self_service.only">Self-service only</string>
     <string name="type.self_service.partially">Partial self-service</string>
     <string name="type.self_service.no">No self-service</string>
-    <string name="widget_name">Favorite Place</string>
-    <string name="widget_description">Quick access to your favorite places</string>
-    <string name="select_bookmark">Select bookmark</string>
     <!-- https://wiki.openstreetmap.org/wiki/Key:social_facility -->
     <string name="type.amenity.social_facility">Social Facility</string>
     <!-- https://wiki.openstreetmap.org/wiki/Tag:emergency=emergency_ward_entrance -->
