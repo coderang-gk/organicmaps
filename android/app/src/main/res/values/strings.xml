@@ -2328,7 +2328,6 @@
     <string name="type.self_service.no">No self-service</string>
     <string name="widget_name">Favorite Place</string>
     <string name="widget_description">Quick access to your favorite places</string>
-    <string name="favorite_place">Favorite Place</string>
     <string name="select_bookmark">Select bookmark</string>
     <!-- https://wiki.openstreetmap.org/wiki/Key:social_facility -->
     <string name="type.amenity.social_facility">Social Facility</string>

@@ -24,6 +24,7 @@ import app.organicmaps.bookmarks.data.BookmarkManager;
 import app.organicmaps.content.DataSource;
 import app.organicmaps.MwmApplication;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,8 +47,17 @@ public class FavoriteBookmarkWidgetConfigActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_widget_config);
 
+        mSelectTextView = findViewById(R.id.select_text);
+        mCategoriesRecyclerView = findViewById(R.id.categories_recycler);
+        mBookmarksRecyclerView = findViewById(R.id.bookmarks_recycler);
+        mBackButton = findViewById(R.id.back_button);
 
+        mCategoriesRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        mBookmarksRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+
+        mBackButton.setOnClickListener(v -> onBackPressed());
 
         setResult(RESULT_CANCELED);
 
@@ -64,20 +74,21 @@ public class FavoriteBookmarkWidgetConfigActivity extends AppCompatActivity {
             return;
         }
 
+        try {
+            MwmApplication app = MwmApplication.from(this);
+            if (!app.arePlatformAndCoreInitialized()) {
 
-        setContentView(R.layout.activity_widget_config);
-
-        mSelectTextView = findViewById(R.id.select_text);
-        mCategoriesRecyclerView = findViewById(R.id.categories_recycler);
-        mBookmarksRecyclerView = findViewById(R.id.bookmarks_recycler);
-        mBackButton = findViewById(R.id.back_button);
-
-        mCategoriesRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        mBookmarksRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-
-        mBackButton.setOnClickListener(v -> onBackPressed());
-
-        loadCategories();
+                
+                app.init(() -> {
+                    runOnUiThread(this::loadCategories);
+                });
+            } else {
+                loadCategories();
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to initialize app", e);
+            finish();
+    }
     }
 
     private void loadCategories() {
