@@ -33932,3 +33932,17 @@
     vi = Tự động điều hướng
     zh-Hans = 自动导航
     zh-Hant = 自動導航
+
+[widget_name]
+    tags = android
+    en = Favorite Place
+
+[select_bookmark]
+    tags = android
+    en = Select bookmark
+
+[widget_description]
+    tags = android
+    en = Quick access to your favorite places
+
+
