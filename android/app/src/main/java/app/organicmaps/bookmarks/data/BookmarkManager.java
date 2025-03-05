@@ -12,6 +12,7 @@ import androidx.annotation.MainThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
+
 import app.organicmaps.Framework;
 import app.organicmaps.bookmarks.DataChangedListener;
 import app.organicmaps.util.KeyValue;
@@ -33,7 +34,7 @@ public enum BookmarkManager
   INSTANCE;
 
   @Retention(RetentionPolicy.SOURCE)
-  @IntDef({ SORT_BY_TYPE, SORT_BY_DISTANCE, SORT_BY_TIME, SORT_BY_NAME })
+  @IntDef({SORT_BY_TYPE, SORT_BY_DISTANCE, SORT_BY_TIME, SORT_BY_NAME})
   public @interface SortingType {}
 
   public static final int SORT_BY_TYPE = 0;
@@ -145,6 +146,191 @@ public enum BookmarkManager
       nativeRemoveElevationActiveChangedListener();
 
     mOnElevationActivePointChangedListener = listener;
+  }
+
+
+  @Nullable
+  public BookmarkInfo findBookmarkByCoordinates(double latitude, double longitude, @Nullable String name, @Nullable String categoryName)
+  {
+    final double MAX_DISTANCE_TOLERANCE = 50.0;
+
+    List<BookmarkCategory> categories = getCategories();
+
+    BookmarkInfo closestMatch = null;
+    double closestDistance = Double.MAX_VALUE;
+
+    for (BookmarkCategory category : categories)
+    {
+      if (categoryName != null && !categoryName.isEmpty() &&
+          !category.getName().equals(categoryName))
+      {
+        continue;
+      }
+
+      for (int i = 0; i < category.getBookmarksCount(); i++)
+      {
+        long bookmarkId = getBookmarkIdByPosition(category.getId(), i);
+        BookmarkInfo bookmarkInfo = getBookmarkInfo(bookmarkId);
+
+        if (bookmarkInfo == null)
+          continue;
+
+        boolean nameMatches = name == null || name.isEmpty() ||
+            bookmarkInfo.getName().equals(name);
+
+        double distance = calculateDistance(latitude, longitude,
+            bookmarkInfo.getLat(),
+            bookmarkInfo.getLon());
+
+        if (nameMatches && distance <= MAX_DISTANCE_TOLERANCE)
+        {
+          if (distance < closestDistance)
+          {
+            closestMatch = bookmarkInfo;
+            closestDistance = distance;
+          }
+        }
+      }
+    }
+
+    return closestMatch;
+  }
+
+  @Nullable
+  private BookmarkInfo findExactBookmarkByCoordinates(double lat, double lon, @Nullable String name, @Nullable String categoryName)
+  {
+    final double COORD_TOLERANCE = 0.0001;
+
+    List<BookmarkCategory> categories = getCategories();
+
+    if (categoryName != null && !categoryName.isEmpty())
+    {
+      for (BookmarkCategory category : categories)
+      {
+        if (categoryName.equals(category.getName()))
+        {
+          for (int i = 0; i < category.getBookmarksCount(); i++)
+          {
+            long bookmarkId = getBookmarkIdByPosition(category.getId(), i);
+            BookmarkInfo bookmark = getBookmarkInfo(bookmarkId);
+
+            if (bookmark != null &&
+                (name == null || name.isEmpty() || name.equals(bookmark.getName())) &&
+                Math.abs(bookmark.getLat() - lat) < COORD_TOLERANCE &&
+                Math.abs(bookmark.getLon() - lon) < COORD_TOLERANCE)
+            {
+              return bookmark;
+            }
+          }
+        }
+      }
+    }
+
+    for (BookmarkCategory category : categories)
+    {
+      for (int i = 0; i < category.getBookmarksCount(); i++)
+      {
+        long bookmarkId = getBookmarkIdByPosition(category.getId(), i);
+        BookmarkInfo bookmark = getBookmarkInfo(bookmarkId);
+
+        if (bookmark != null &&
+            (name == null || name.isEmpty() || name.equals(bookmark.getName())) &&
+            Math.abs(bookmark.getLat() - lat) < COORD_TOLERANCE &&
+            Math.abs(bookmark.getLon() - lon) < COORD_TOLERANCE)
+        {
+          return bookmark;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  @Nullable
+  private BookmarkInfo findNearestBookmark(double lat, double lon, double maxDistanceMeters,
+                                           @Nullable String name, @Nullable String categoryName)
+  {
+    List<BookmarkCategory> categories = getCategories();
+    BookmarkInfo closestBookmark = null;
+    double closestDistance = Double.MAX_VALUE;
+
+    if (categoryName != null && !categoryName.isEmpty())
+    {
+      for (BookmarkCategory category : categories)
+      {
+        if (categoryName.equals(category.getName()))
+        {
+          BookmarkInfo categoryResult = findNearestInCategory(category, lat, lon,
+              maxDistanceMeters, name, closestDistance);
+          if (categoryResult != null)
+          {
+            return categoryResult;
+          }
+          break;
+        }
+      }
+    }
+
+    for (BookmarkCategory category : categories)
+    {
+      if (categoryName != null && !categoryName.isEmpty() && categoryName.equals(category.getName()))
+      {
+        continue;
+      }
+
+      BookmarkInfo categoryResult = findNearestInCategory(category, lat, lon,
+          maxDistanceMeters, name, closestDistance);
+      if (categoryResult != null)
+      {
+        closestBookmark = categoryResult;
+        closestDistance = calculateDistance(lat, lon, closestBookmark.getLat(), closestBookmark.getLon());
+      }
+    }
+
+    return closestBookmark;
+  }
+
+  @Nullable
+  private BookmarkInfo findNearestInCategory(BookmarkCategory category, double lat, double lon,
+                                             double maxDistanceMeters, @Nullable String name, double currentClosestDistance)
+  {
+    BookmarkInfo closestBookmark = null;
+    double closestDistance = currentClosestDistance;
+
+    for (int i = 0; i < category.getBookmarksCount(); i++)
+    {
+      long bookmarkId = getBookmarkIdByPosition(category.getId(), i);
+      BookmarkInfo bookmark = getBookmarkInfo(bookmarkId);
+
+      if (bookmark != null && (name == null || name.isEmpty() || name.equals(bookmark.getName())))
+      {
+        double distance = calculateDistance(lat, lon, bookmark.getLat(), bookmark.getLon());
+
+        if (distance < closestDistance && distance <= maxDistanceMeters)
+        {
+          closestBookmark = bookmark;
+          closestDistance = distance;
+        }
+      }
+    }
+
+    return closestBookmark;
+  }
+
+  private double calculateDistance(double lat1, double lon1, double lat2, double lon2)
+  {
+    final double earthRadius = 6371000;
+
+    double dLat = Math.toRadians(lat2 - lat1);
+    double dLon = Math.toRadians(lon2 - lon1);
+
+    double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return earthRadius * c;
   }
 
   // Called from JNI.
@@ -313,9 +499,9 @@ public enum BookmarkManager
     return nativeGetTrackIdByPosition(catId, positionInCategory);
   }
 
-  public static void loadBookmarks() { nativeLoadBookmarks(); }
+  public static void loadBookmarks() {nativeLoadBookmarks();}
 
-  public void deleteCategory(long catId) { nativeDeleteCategory(catId); }
+  public void deleteCategory(long catId) {nativeDeleteCategory(catId);}
 
   public void deleteTrack(long trackId)
   {
@@ -327,14 +513,14 @@ public enum BookmarkManager
     nativeDeleteBookmark(bmkId);
   }
 
-  public long createCategory(@NonNull String name) { return nativeCreateCategory(name); }
+  public long createCategory(@NonNull String name) {return nativeCreateCategory(name);}
 
-  public void showBookmarkOnMap(long bmkId) { nativeShowBookmarkOnMap(bmkId); }
+  public void showBookmarkOnMap(long bmkId) {nativeShowBookmarkOnMap(bmkId);}
 
-  public void showBookmarkCategoryOnMap(long catId) { nativeShowBookmarkCategoryOnMap(catId); }
+  public void showBookmarkCategoryOnMap(long catId) {nativeShowBookmarkCategoryOnMap(catId);}
 
   @Icon.PredefinedColor
-  public int getLastEditedColor() { return nativeGetLastEditedColor(); }
+  public int getLastEditedColor() {return nativeGetLastEditedColor();}
 
   @MainThread
   public void loadBookmarksFile(@NonNull String path, boolean isTemporaryFile)
@@ -374,7 +560,7 @@ public enum BookmarkManager
 
     final String lowerCaseFilename = filename.toLowerCase(java.util.Locale.ROOT);
     // Check that filename contains bookmarks extension.
-    for (String ext: BOOKMARKS_EXTENSIONS)
+    for (String ext : BOOKMARKS_EXTENSIONS)
     {
       if (lowerCaseFilename.endsWith(ext))
         return filename;
@@ -434,8 +620,7 @@ public enum BookmarkManager
       Logger.d(TAG, "Downloaded bookmarks file from " + uri + " into " + filename);
       UiThread.run(() -> loadBookmarksFile(tempFile.getAbsolutePath(), true));
       return true;
-    }
-    catch (IOException|SecurityException e)
+    } catch (IOException | SecurityException e)
     {
       Logger.e(TAG, "Could not download bookmarks file from " + uri, e);
       UiThread.run(() -> {
@@ -449,7 +634,7 @@ public enum BookmarkManager
   @WorkerThread
   public void importBookmarksFiles(@NonNull ContentResolver resolver, @NonNull List<Uri> uris, @NonNull File tempDir)
   {
-    for (Uri uri: uris)
+    for (Uri uri : uris)
       importBookmarksFile(resolver, uri, tempDir);
   }
 
@@ -463,6 +648,7 @@ public enum BookmarkManager
   {
     return mCurrentDataProvider.getCategories();
   }
+
   public int getCategoriesCount()
   {
     return mCurrentDataProvider.getCategoriesCount();
@@ -500,7 +686,7 @@ public enum BookmarkManager
     return nativeIsUsedCategoryName(name);
   }
 
-  public void prepareForSearch(long catId) { nativePrepareForSearch(catId); }
+  public void prepareForSearch(long catId) {nativePrepareForSearch(catId);}
 
   public boolean areAllCategoriesVisible()
   {
@@ -537,17 +723,17 @@ public enum BookmarkManager
     nativeSetNotificationsEnabled(enabled);
   }
 
-  public boolean hasLastSortingType(long catId) { return nativeHasLastSortingType(catId); }
+  public boolean hasLastSortingType(long catId) {return nativeHasLastSortingType(catId);}
 
   @SortingType
-  public int getLastSortingType(long catId) { return nativeGetLastSortingType(catId); }
+  public int getLastSortingType(long catId) {return nativeGetLastSortingType(catId);}
 
   public void setLastSortingType(long catId, @SortingType int sortingType)
   {
     nativeSetLastSortingType(catId, sortingType);
   }
 
-  public void resetLastSortingType(long catId) { nativeResetLastSortingType(catId); }
+  public void resetLastSortingType(long catId) {nativeResetLastSortingType(catId);}
 
   @NonNull
   @SortingType
@@ -571,9 +757,12 @@ public enum BookmarkManager
 
   @NonNull
   native BookmarkCategory nativeGetBookmarkCategory(long catId);
+
   @NonNull
   native BookmarkCategory[] nativeGetBookmarkCategories();
+
   native int nativeGetBookmarkCategoriesCount();
+
   @NonNull
   native BookmarkCategory[] nativeGetChildrenCategories(long catId);
 
@@ -714,7 +903,7 @@ public enum BookmarkManager
         !description.equals(getBookmarkDescription(bookmark.getBookmarkId())))
     {
       setBookmarkParams(bookmark.getBookmarkId(), name,
-                        icon != null ? icon.getColor() : getLastEditedColor(), description);
+          icon != null ? icon.getColor() : getLastEditedColor(), description);
     }
   }
 
@@ -730,7 +919,7 @@ public enum BookmarkManager
 
   public double getElevationCurPositionDistance(long trackId)
   {
-   return nativeGetElevationCurPositionDistance(trackId);
+    return nativeGetElevationCurPositionDistance(trackId);
   }
 
   public void setElevationActivePoint(long trackId, double distance)
@@ -866,6 +1055,7 @@ public enum BookmarkManager
   private static native String nativeGetBookmarkDescription(@IntRange(from = 0) long bookmarkId);
 
   private static native String nativeGetTrackDescription(@IntRange(from = 0) long trackId);
+
   private static native double nativeGetBookmarkScale(@IntRange(from = 0) long bookmarkId);
 
   @NonNull
@@ -913,17 +1103,25 @@ public enum BookmarkManager
   public interface BookmarksLoadingListener
   {
     default void onBookmarksLoadingStarted() {}
+
     default void onBookmarksLoadingFinished() {}
+
     default void onBookmarksFileUnsupported(@NonNull Uri uri) {}
+
     default void onBookmarksFileDownloadFailed(@NonNull Uri uri, @NonNull String string) {}
+
     default void onBookmarksFileImportSuccessful() {}
+
     default void onBookmarksFileImportFailed() {}
   }
 
   public interface BookmarksSortingListener
   {
     void onBookmarksSortingCompleted(@NonNull SortedBlock[] sortedBlocks, long timestamp);
-    default void onBookmarksSortingCancelled(long timestamp) {};
+
+    default void onBookmarksSortingCancelled(long timestamp) {}
+
+    ;
   }
 
   public interface BookmarksSharingListener

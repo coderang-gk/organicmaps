@@ -382,16 +382,16 @@
     </activity-alias>
 
     <activity
-            android:name="app.organicmaps.MwmActivity"
-            android:launchMode="singleTask"
-            android:configChanges="uiMode"
-            android:screenOrientation="fullUser"
-            android:exported="true"
-            android:windowSoftInputMode="stateAlwaysHidden|adjustPan">
-            <intent-filter>
-                <action android:name="app.organicmaps.action.SHOW_BOOKMARK" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
+        android:name="app.organicmaps.MwmActivity"
+        android:launchMode="singleTask"
+        android:configChanges="uiMode"
+        android:screenOrientation="fullUser"
+        android:exported="true"
+        android:windowSoftInputMode="stateAlwaysHidden|adjustPan">
+      <intent-filter>
+        <action android:name="app.organicmaps.action.SHOW_BOOKMARK" />
+        <category android:name="android.intent.category.DEFAULT" />
+      </intent-filter>
     </activity>    
 
     <activity-alias

@@ -40,12 +40,13 @@ import androidx.fragment.app.FragmentFactory;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 import androidx.lifecycle.ViewModelProvider;
+
 import app.organicmaps.Framework.PlacePageActivationListener;
 import app.organicmaps.api.Const;
 import app.organicmaps.base.BaseMwmFragmentActivity;
 import app.organicmaps.base.OnBackPressListener;
 import app.organicmaps.bookmarks.BookmarkCategoriesActivity;
-import app.organicmaps.bookmarks.data.BookmarkCategory;
+import app.organicmaps.bookmarks.data.BookmarkInfo;
 import app.organicmaps.bookmarks.data.BookmarkManager;
 import app.organicmaps.bookmarks.data.MapObject;
 import app.organicmaps.display.DisplayChangedListener;
@@ -112,6 +113,7 @@ import app.organicmaps.widget.menu.MainMenu;
 import app.organicmaps.widget.placepage.PlacePageController;
 import app.organicmaps.widget.placepage.PlacePageData;
 import app.organicmaps.widget.placepage.PlacePageViewModel;
+
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.ArrayList;
@@ -129,20 +131,20 @@ import static app.organicmaps.util.PowerManagment.POWER_MANAGEMENT_TAG;
 
 public class MwmActivity extends BaseMwmFragmentActivity
     implements PlacePageActivationListener,
-               View.OnTouchListener,
-               MapRenderingListener,
-               RoutingController.Container,
-               LocationListener,
-               SensorListener,
-               LocationState.ModeChangeListener,
-               RoutingPlanInplaceController.RoutingPlanListener,
-               RoutingBottomMenuListener,
-               BookmarkManager.BookmarksLoadingListener,
-               FloatingSearchToolbarController.SearchToolbarListener,
-               MenuBottomSheetFragment.MenuBottomSheetInterfaceWithHeader,
-               PlacePageController.PlacePageRouteSettingsListener,
-               MapButtonsController.MapButtonClickListener,
-               DisplayChangedListener
+    View.OnTouchListener,
+    MapRenderingListener,
+    RoutingController.Container,
+    LocationListener,
+    SensorListener,
+    LocationState.ModeChangeListener,
+    RoutingPlanInplaceController.RoutingPlanListener,
+    RoutingBottomMenuListener,
+    BookmarkManager.BookmarksLoadingListener,
+    FloatingSearchToolbarController.SearchToolbarListener,
+    MenuBottomSheetFragment.MenuBottomSheetInterfaceWithHeader,
+    PlacePageController.PlacePageRouteSettingsListener,
+    MapButtonsController.MapButtonClickListener,
+    DisplayChangedListener
 {
   private static final String TAG = MwmActivity.class.getSimpleName();
 
@@ -154,15 +156,15 @@ public class MwmActivity extends BaseMwmFragmentActivity
   private static final String EXTRA_CONSUMED = "mwm.extra.intent.processed";
   private boolean mPreciseLocationDialogShown = false;
 
-  private static final String[] DOCKED_FRAGMENTS = { SearchFragment.class.getName(),
-                                                     DownloaderFragment.class.getName(),
-                                                     RoutingPlanFragment.class.getName(),
-                                                     EditorHostFragment.class.getName(),
-                                                     ReportFragment.class.getName() };
+  private static final String[] DOCKED_FRAGMENTS = {SearchFragment.class.getName(),
+      DownloaderFragment.class.getName(),
+      RoutingPlanFragment.class.getName(),
+      EditorHostFragment.class.getName(),
+      ReportFragment.class.getName()};
 
   public final ActivityResultLauncher<Intent> startDrivingOptionsForResult = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), activityResult ->
   {
-     if( activityResult.getResultCode() == Activity.RESULT_OK)
+    if (activityResult.getResultCode() == Activity.RESULT_OK)
       rebuildLastRoute();
   });
 
@@ -328,23 +330,38 @@ public class MwmActivity extends BaseMwmFragmentActivity
       Framework.nativeShowCountry(countryId, false);
       return;
     }
-    
-final int categoryIndex = intent.getIntExtra("CATEGORY_INDEX", -1);
-final int bookmarkIndex = intent.getIntExtra("BOOKMARK_INDEX", -1);
 
-if (categoryIndex >= 0 && bookmarkIndex >= 0) {
-    List<BookmarkCategory> categories = BookmarkManager.INSTANCE.getCategories();
-    
-    if (categoryIndex < categories.size()) {
-        BookmarkCategory category = categories.get(categoryIndex);
-        
-        if (bookmarkIndex < category.getBookmarksCount()) {
-            long widgetbookmarkId = BookmarkManager.INSTANCE.getBookmarkIdByPosition(category.getId(), bookmarkIndex);
-            BookmarkManager.INSTANCE.showBookmarkOnMap(widgetbookmarkId);
+    if (intent != null && "app.organicmaps.action.SHOW_BOOKMARK".equals(intent.getAction()))
+    {
+      boolean fromWidget = intent.getBooleanExtra("FROM_WIDGET", false);
+
+      String bookmarkName = intent.getStringExtra("BOOKMARK_NAME");
+      double lat = intent.getDoubleExtra("BOOKMARK_LAT", Double.NaN);
+      double lon = intent.getDoubleExtra("BOOKMARK_LON", Double.NaN);
+      String categoryName = intent.getStringExtra("BOOKMARK_CATEGORY");
+
+      if (!Double.isNaN(lat) && !Double.isNaN(lon))
+      {
+        try
+        {
+          BookmarkInfo nearestBookmark = BookmarkManager.INSTANCE.findBookmarkByCoordinates(
+              lat, lon, bookmarkName, categoryName
+          );
+
+          if (nearestBookmark != null)
+          {
+
+            BookmarkManager.INSTANCE.showBookmarkOnMap(nearestBookmark.getBookmarkId());
             return;
+          }
+        } catch (Exception e)
+        {
+
         }
+
+        Framework.nativeZoomToPoint(lat, lon, 16, true);
+      }
     }
-}
 
     final IntentProcessor[] mIntentProcessors = {
         new Factory.UrlProcessor(),
@@ -377,12 +394,12 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
       text.setMovementMethod(LinkMovementMethod.getInstance());
 
       mAlertDialog = new MaterialAlertDialogBuilder(this, R.style.MwmTheme_AlertDialog)
-              .setTitle(R.string.login_osm)
-              .setView(text)
-              .setPositiveButton(R.string.login, navigateToLoginHandler)
-              .setNegativeButton(R.string.cancel, null)
-              .setOnDismissListener(dialog -> mAlertDialog = null)
-              .show();
+          .setTitle(R.string.login_osm)
+          .setView(text)
+          .setPositiveButton(R.string.login, navigateToLoginHandler)
+          .setNegativeButton(R.string.cancel, null)
+          .setOnDismissListener(dialog -> mAlertDialog = null)
+          .show();
     }
   }
 
@@ -395,7 +412,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
   protected int getFragmentContentResId()
   {
     return (mIsTabletLayout ? R.id.fragment_container
-                            : super.getFragmentContentResId());
+        : super.getFragmentContentResId());
   }
 
   @Nullable
@@ -555,7 +572,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
 
     mSearchController = new FloatingSearchToolbarController(this, this);
     mSearchController.getToolbar()
-                     .getViewTreeObserver();
+        .getViewTreeObserver();
 
     // Note: You must call registerForActivityResult() before the fragment or activity is created.
     mLocationPermissionRequest = registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
@@ -602,8 +619,8 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
   {
     UiUtils.setLightStatusBar(this, !(
         ThemeUtils.isNightTheme(this)
-        || RoutingController.get().isPlanning()
-        || Framework.nativeGetChoosePositionMode() != Framework.ChoosePositionMode.NONE
+            || RoutingController.get().isPlanning()
+            || Framework.nativeGetChoosePositionMode() != Framework.ChoosePositionMode.NONE
     ));
   }
 
@@ -680,12 +697,12 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
               startActivity(new Intent(MwmActivity.this, FeatureCategoryActivity.class));
             else
             {
-                dismissAlertDialog();
-                mAlertDialog = new MaterialAlertDialogBuilder(this, R.style.MwmTheme_AlertDialog)
-                    .setTitle(R.string.message_invalid_feature_position)
-                    .setPositiveButton(R.string.ok, null)
-                    .setOnDismissListener(dialog -> mAlertDialog = null)
-                    .show();
+              dismissAlertDialog();
+              mAlertDialog = new MaterialAlertDialogBuilder(this, R.style.MwmTheme_AlertDialog)
+                  .setTitle(R.string.message_invalid_feature_position)
+                  .setPositiveButton(R.string.ok, null)
+                  .setOnDismissListener(dialog -> mAlertDialog = null)
+                  .show();
             }
             break;
           case Framework.ChoosePositionMode.NONE:
@@ -717,9 +734,11 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
     }
   }
 
-  /** Hides/shows UI while keeping state
+  /**
+   * Hides/shows UI while keeping state
+   *
    * @param isUiHidden True to hide the UI
-  **/
+   **/
   public void hideOrShowUIWithoutClosingPlacePage(boolean isUiHidden)
   {
     // Used instead of closeBottomSheet to preserve state and hide instantly
@@ -819,23 +838,23 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
   {
     switch (button)
     {
-      case zoomIn -> Map.zoomIn();
-      case zoomOut -> Map.zoomOut();
-      case myPosition ->
-      {
-        Logger.i(LOCATION_TAG, "The location button pressed");
-        // Calls onMyPositionModeChanged(mode + 1).
-        LocationState.nativeSwitchToNextMode();
-      }
-      case toggleMapLayer -> toggleMapLayerBottomSheet();
-      case bookmarks -> showBookmarks();
-      case search -> showSearch("");
-      case menu ->
-      {
-        closeFloatingPanels();
-        showBottomSheet(MAIN_MENU_ID);
-      }
-      case help -> showHelp();
+    case zoomIn -> Map.zoomIn();
+    case zoomOut -> Map.zoomOut();
+    case myPosition ->
+    {
+      Logger.i(LOCATION_TAG, "The location button pressed");
+      // Calls onMyPositionModeChanged(mode + 1).
+      LocationState.nativeSwitchToNextMode();
+    }
+    case toggleMapLayer -> toggleMapLayerBottomSheet();
+    case bookmarks -> showBookmarks();
+    case search -> showSearch("");
+    case menu ->
+    {
+      closeFloatingPanels();
+      showBottomSheet(MAIN_MENU_ID);
+    }
+    case help -> showHelp();
     }
   }
 
@@ -918,7 +937,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
   }
 
   /**
-   * @param clearText True to clear the search query
+   * @param clearText  True to clear the search query
    * @param stopSearch True to stop the search engine
    * @return False if the search toolbar was already closed and the search query was empty, true otherwise
    */
@@ -1095,7 +1114,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
     if (isMapRendererActive())
       processIntent();
     if (intent.getAction() != null && intent.getAction()
-                                            .equals(TrackRecordingService.STOP_TRACK_RECORDING))
+        .equals(TrackRecordingService.STOP_TRACK_RECORDING))
     {
       //closes the bottom sheet in case it is opened to deal with updation of track recording status in bottom sheet.
       closeBottomSheet(MAIN_MENU_ID);
@@ -1107,7 +1126,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
   private boolean isMapRendererActive()
   {
     return mMapFragment != null && Map.isEngineCreated()
-           && mMapFragment.isContextCreated();
+        && mMapFragment.isContextCreated();
   }
 
   @CallSuper
@@ -1223,8 +1242,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
       try
       {
         super.onBackPressed();
-      }
-      catch (IllegalStateException e)
+      } catch (IllegalStateException e)
       {
         // Sometimes this can be called after onSaveState() for unknown reason.
       }
@@ -1251,8 +1269,8 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
       return;
 
     fm.beginTransaction()
-      .remove(fragment)
-      .commitAllowingStateLoss();
+        .remove(fragment)
+        .commitAllowingStateLoss();
     fm.executePendingTransactions();
   }
 
@@ -1320,8 +1338,8 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
   private void setFullscreen(boolean isFullscreen)
   {
     if (RoutingController.get().isNavigating()
-            || RoutingController.get().isBuilding()
-            || RoutingController.get().isPlanning())
+        || RoutingController.get().isBuilding()
+        || RoutingController.get().isPlanning())
       return;
 
     mMapButtonsViewModel.setButtonsHidden(isFullscreen);
@@ -1336,8 +1354,10 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
   }
 
   @Override
-  public boolean dispatchGenericMotionEvent(MotionEvent event) {
-    if (event.getActionMasked() == MotionEvent.ACTION_SCROLL) {
+  public boolean dispatchGenericMotionEvent(MotionEvent event)
+  {
+    if (event.getActionMasked() == MotionEvent.ACTION_SCROLL)
+    {
       int exponent = event.getAxisValue(MotionEvent.AXIS_VSCROLL) < 0 ? -1 : 1;
       Map.onScale(Math.pow(1.7f, exponent), event.getX(), event.getY(), true);
       return true;
@@ -1376,7 +1396,8 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
       Map.onCompassUpdated(north, true);
   }
 
-  public void onMapBottomButtonsHeightChange(float height) {
+  public void onMapBottomButtonsHeightChange(float height)
+  {
     updateBottomWidgetsOffset();
   }
 
@@ -1519,7 +1540,8 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
   {
     // TODO This code section may be called when insets are not yet initialized
     // This is only a workaround to prevent crashes but a proper fix should be implemented
-    if (mCurrentWindowInsets == null) {
+    if (mCurrentWindowInsets == null)
+    {
       return;
     }
     int offset = mCurrentWindowInsets.getInsets(WindowInsetsCompat.Type.systemBars()).top;
@@ -1700,7 +1722,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
   public void onCommonBuildError(int lastResultCode, @NonNull String[] lastMissingMaps)
   {
     RoutingErrorDialogFragment fragment = RoutingErrorDialogFragment.create(getSupportFragmentManager().getFragmentFactory(),
-                                                                            getApplicationContext(), lastResultCode, lastMissingMaps);
+        getApplicationContext(), lastResultCode, lastMissingMaps);
     fragment.show(getSupportFragmentManager(), RoutingErrorDialogFragment.class.getSimpleName());
   }
 
@@ -1875,6 +1897,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
 
   /**
    * Called when location is updated.
+   *
    * @param location new location
    */
   @Override
@@ -1899,6 +1922,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
 
   /**
    * Called when compass data is updated.
+   *
    * @param north offset from the north
    */
   @Override
@@ -1943,6 +1967,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
 
   /**
    * Called on the result of the system location dialog.
+   *
    * @param permissions permissions granted or refused.
    */
   @UiThread
@@ -2029,6 +2054,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
 
   /**
    * Called on the result of the POST_NOTIFICATIONS request.
+   *
    * @param granted true if permission has been granted.
    */
   @UiThread
@@ -2051,6 +2077,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
 
   /**
    * Called by GoogleFusedLocationProvider to request to GPS and/or Wi-Fi.
+   *
    * @param pendingIntent an intent to launch.
    */
   @Override
@@ -2070,6 +2097,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
 
   /**
    * Triggered by onLocationResolutionRequired().
+   *
    * @param result invocation result.
    */
   @UiThread
@@ -2282,23 +2310,23 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
   {
     switch (keyCode)
     {
-      case KeyEvent.KEYCODE_DPAD_DOWN:
-        Map.zoomOut();
+    case KeyEvent.KEYCODE_DPAD_DOWN:
+      Map.zoomOut();
+      return true;
+    case KeyEvent.KEYCODE_DPAD_UP:
+      Map.zoomIn();
+      return true;
+    case KeyEvent.KEYCODE_ESCAPE:
+      final Intent currIntent = getIntent();
+      final String backUrl = Framework.nativeGetParsedBackUrl();
+      if (TextUtils.isEmpty(backUrl) || (currIntent != null && Factory.isStartedForApiResult(currIntent)))
+      {
+        finish();
         return true;
-      case KeyEvent.KEYCODE_DPAD_UP:
-        Map.zoomIn();
-        return true;
-      case KeyEvent.KEYCODE_ESCAPE:
-        final Intent currIntent = getIntent();
-        final String backUrl = Framework.nativeGetParsedBackUrl();
-        if (TextUtils.isEmpty(backUrl) || (currIntent != null && Factory.isStartedForApiResult(currIntent)))
-        {
-          finish();
-          return true;
-        }
-        return super.onKeyUp(keyCode, event);
-      default:
-        return super.onKeyUp(keyCode, event);
+      }
+      return super.onKeyUp(keyCode, event);
+    default:
+      return super.onKeyUp(keyCode, event);
     }
   }
 
@@ -2336,7 +2364,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
       // according to action of user. Calling it hack because we are avoiding
       // creation of new methods by using this variable.
       mLocationPermissionRequestedForRecording = true;
-      mLocationPermissionRequest.launch(new String[] { ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION });
+      mLocationPermissionRequest.launch(new String[]{ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION});
       return false;
     }
 
@@ -2375,7 +2403,7 @@ if (categoryIndex >= 0 && bookmarkIndex >= 0) {
     if (TrackRecorder.nativeIsTrackRecordingEmpty())
     {
       Toast.makeText(this, R.string.track_recording_toast_nothing_to_save, Toast.LENGTH_SHORT)
-           .show();
+          .show();
       stopTrackRecording();
       return;
     }
